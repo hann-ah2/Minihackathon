@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Responder Map Dashboard</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 20px;
+    }
+
+    /* Map Container */
+    .map-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: 520px;
+      margin: 0 auto;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #334155;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      
+      /* Replace 'map-screenshot.png' with your actual map image */
+      background-color: #1e293b;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        url('map-screenshot.png');
+      background-size: 40px 40px, 40px 40px, cover;
+      background-position: center;
+    }
+
+    /* Base Pin Styling */
+    .map-pin {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    /* Expanding Pulse Ring */
+    .map-pin::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      animation: pulse-ring 1.8s infinite ease-out;
+      z-index: -1;
+    }
+
+    /* Urgency Color Levels */
+    .map-pin.critical {
+      background-color: #ef4444;
+      box-shadow: 0 0 12px #ef4444;
+    }
+    .map-pin.critical::after {
+      background-color: #ef4444;
+      animation-duration: 1.2s; /* Pulses faster for Critical */
+    }
+
+    .map-pin.high {
+      background-color: #f97316;
+      box-shadow: 0 0 12px #f97316;
+    }
+    .map-pin.high::after {
+      background-color: #f97316;
+    }
+
+    .map-pin.medium {
+      background-color: #eab308;
+      box-shadow: 0 0 10px #eab308;
+    }
+    .map-pin.medium::after {
+      background-color: #eab308;
+      animation-duration: 2.2s;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        transform: scale(1);
+        opacity: 0.85;
+      }
+      100% {
+        transform: scale(3.8);
+        opacity: 0;
+      }
+    }
+
+    /* Hover Tooltip Card (Pure CSS) */
+    .pin-tooltip {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 210px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #475569;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.4;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .map-pin:hover .pin-tooltip {
+      opacity: 1;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .badge.critical { background: #ef4444; color: #fff; }
+    .badge.high { background: #f97316; color: #fff; }
+    .badge.medium { background: #eab308; color: #000; }
+
+    /* Map Legend Overlay */
+    .map-legend {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #334155;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Quick Demo Button */
+    .demo-controls {
+      max-width: 900px;
+      margin: 15px auto 0;
+      text-align: right;
+    }
+
+    .btn-simulate {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-simulate:hover { background: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <div class="map-container" id="responderMap">
+    
+    <!-- SQL Report #101 -->
+    <div class="map-pin critical" style="top: 35%; left: 42%;">
+      <div class="pin-tooltip">
+        <span class="badge critical">Critical</span>
+        <div><strong>#101: Building Collapse</strong></div>
+        <div>Need: Heavy Rescue Tools</div>
+      </div>
+    </div>
+
+    <!-- SQL Report #102 -->
+    <div class="map-pin medium" style="top: 60%; left: 68%;">
+      <div class="pin-tooltip">
+        <span class="badge medium">Medium</span>
+        <div><strong>#102: Blocked Road</strong></div>
+        <div>Need: Bulldozer / Clearing</div>
+      </div>
+    </div>
+
+    <!-- SQL Report #103 -->
+    <div class="map-pin critical" style="top: 48%; left: 38%;">
+      <div class="pin-tooltip">
+        <span class="badge critical">Critical</span>
+        <div><strong>#103: Trapped Persons</strong></div>
+        <div>Need: Medical Supplies</div>
+      </div>
+    </div>
+
+    <!-- SQL Report #105 -->
+    <div class="map-pin high" style="top: 25%; left: 75%;">
+      <div class="pin-tooltip">
+        <span class="badge high">High</span>
+        <div><strong>#105: Fire</strong></div>
+        <div>Need: Fire Extinguishers</div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="map-legend">
+      <strong>Live Triage Density</strong>
+      <div class="legend-item">
+        <span class="legend-dot" style="background: #ef4444;"></span> Critical (Immediate Aid)
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot" style="background: #f97316;"></span> High Priority
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot" style="background: #eab308;"></span> Medium Priority
+      </div>
+    </div>
+  </div>
+
+  <!-- Demo Trigger to test adding a new pin -->
+  <div class="demo-controls">
+    <button class="btn-simulate" onclick="spawnNewReport()">+ Simulate New Survivor Report</button>
+  </div>
+
+  <script>
+    // Call this function when your Survivor Form is submitted!
+    function addMapPin(id, disasterType, resourceNeeded, level, topPercent, leftPercent) {
+      const map = document.getElementById('responderMap');
+      const levelClass = level.toLowerCase(); // 'critical', 'high', or 'medium'
+
+      const pin = document.createElement('div');
+      pin.className = `map-pin ${levelClass}`;
+      pin.style.top = topPercent + '%';
+      pin.style.left = leftPercent + '%';
+
+      pin.innerHTML = `
+        <div class="pin-tooltip">
+          <span class="badge ${levelClass}">${level}</span>
+          <div><strong>#${id}: ${disasterType}</strong></div>
+          <div>Need: ${resourceNeeded}</div>
+        </div>
+      `;
+
+      map.appendChild(pin);
+    }
+
+    // Example function wired to the demo button
+    function spawnNewReport() {
+      const randomTop = Math.floor(Math.random() * 60) + 20;
+      const randomLeft = Math.floor(Math.random() * 60) + 20;
+      addMapPin(106, 'Aftershock Collapse', 'Trauma Kits & Water', 'Critical', randomTop, randomLeft);
+    }
+  </script>
+
+</body>
+</html>
