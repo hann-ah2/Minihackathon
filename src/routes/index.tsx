@@ -123,7 +123,7 @@ function CommunityDashboard() {
               </div>
               <fieldset><legend className={label}>3. Is Anyone in Immediate Danger? *</legend>
                 <div className="grid grid-cols-3 gap-2">
-                  {([['yes','Yes · Critical'],['unsure','Unsure'],['no','No']] as const).map(([value, text]) =>
+                  {([['yes', 'Yes · Critical'], ['unsure', 'Unsure'], ['no', 'No']] as const).map(([value, text]) =>
                     <button type="button" key={value} onClick={() => setDanger(value)}
                       className={`rounded-lg border px-1 py-2.5 text-xs font-bold ${danger === value ? 'border-red-500 bg-red-500/20 text-white' : 'border-[#334155] bg-[#0f172a] text-slate-400'}`}>{text}</button>)}
                 </div>
@@ -167,13 +167,13 @@ function CommunityDashboard() {
             <button type="button" onClick={() => setPriorityFilter('all')} className={`rounded-full px-3 py-1 text-xs font-bold ${priorityFilter === 'all' ? 'bg-sky-500 text-slate-950' : 'border border-[#334155] bg-[#0f172a] text-slate-300'}`}>All</button>
             {priorities.map(p => <button key={p} type="button" onClick={() => setPriorityFilter(p)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${priorityFilter === p ? 'border-sky-400 bg-slate-700 text-white' : 'border-[#334155] bg-[#0f172a] text-slate-300'}`}>
-              <i className={`h-2 w-2 rounded-full ${colors[p]}`}/>{priorityLabels[p]}
+              <i className={`h-2 w-2 rounded-full ${colors[p]}`} />{priorityLabels[p]}
             </button>)}
           </div>
           {/* Additive blackout demo: does not replace the real Leaflet map. */}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-3">
             <div className="flex items-start gap-2">
-              <WifiOff size={18} className="mt-0.5 shrink-0 text-purple-300"/>
+              <WifiOff size={18} className="mt-0.5 shrink-0 text-purple-300" />
               <div>
                 <strong className="text-xs text-purple-100">Last-Ping Blackout Radar</strong>
                 <p className="mt-1 text-[11px] text-purple-200/80">
@@ -191,16 +191,16 @@ function CommunityDashboard() {
             </button>
           </div>
           <div className="community-map-wrap relative h-[430px] overflow-hidden rounded-xl border-2 border-[#334155] bg-[#0b1325]">
-            <MapView reports={filtered} selectedId={selectedId ?? undefined} onSelect={setSelectedId} onPick={setCoords} position={coords ?? undefined} blackoutDevices={blackoutDevices}/>
+            <MapView reports={filtered} selectedId={selectedId ?? undefined} onSelect={setSelectedId} onPick={setCoords} position={coords ?? undefined} blackoutDevices={blackoutDevices} />
             <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded border border-slate-700 bg-slate-900/90 px-2.5 py-1 text-[10px] text-slate-200">REAL MAP · FICTIONAL INCIDENTS</div>
           </div>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-slate-300">
-            {priorities.map(p => <span key={p} className="flex items-center gap-2"><i className={`h-2.5 w-2.5 rounded-full ${colors[p]}`}/>{priorityLabels[p]}</span>)}
-            <span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-slate-500"/>Resolved</span>
-            <span className="flex items-center gap-2 text-purple-300"><i className="h-2.5 w-2.5 rounded-full bg-purple-500"/>Last Ping (simulation)</span>
+            {priorities.map(p => <span key={p} className="flex items-center gap-2"><i className={`h-2.5 w-2.5 rounded-full ${colors[p]}`} />{priorityLabels[p]}</span>)}
+            <span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full bg-slate-500" />Resolved</span>
+            <span className="flex items-center gap-2 text-purple-300"><i className="h-2.5 w-2.5 rounded-full bg-purple-500" />Last Ping (simulation)</span>
           </div>
           {selectedReport && <div className="mt-3 rounded-lg border border-slate-600 bg-slate-900 p-3 text-xs">
-            <div className="flex items-center justify-between gap-3"><strong className="text-sm text-white">{selectedReport.title}</strong><button onClick={() => setSelectedId(null)} aria-label="Close details"><X size={16}/></button></div>
+            <div className="flex items-center justify-between gap-3"><strong className="text-sm text-white">{selectedReport.title}</strong><button onClick={() => setSelectedId(null)} aria-label="Close details"><X size={16} /></button></div>
             <p className="mt-1 text-slate-300">{selectedReport.description}</p>
             <p className="mt-1 text-sky-300">{selectedReport.location_name} · {selectedReport.assistance_needed}</p>
           </div>}
@@ -220,7 +220,7 @@ function CommunityDashboard() {
                 <thead className="border-b border-slate-700 text-[11px] uppercase text-slate-400"><tr><th className="pb-3">ID</th><th className="pb-3">Disaster Type</th><th className="pb-3">Resource Needed</th><th className="pb-3">Criticality</th><th className="pb-3">Coordinates</th></tr></thead>
                 <tbody>{filtered.map(r => <tr key={r.id} onClick={() => setSelectedId(r.id)} className="cursor-pointer border-b border-slate-700/50 hover:bg-slate-700/30">
                   <td className="py-3 pr-2 font-mono text-slate-400">{r.id}</td><td className="pr-2 font-semibold text-white">{r.category}</td>
-                  <td className="pr-2 text-slate-300">{r.assistance_needed}</td><td className="pr-2"><span className="inline-flex items-center gap-1.5"><i className={`h-2 w-2 rounded-full ${r.status === 'resolved' ? 'bg-slate-500' : colors[r.priority]}`}/>{r.status === 'resolved' ? 'Resolved' : priorityLabels[r.priority]}</span></td>
+                  <td className="pr-2 text-slate-300">{r.assistance_needed}</td><td className="pr-2"><span className="inline-flex items-center gap-1.5"><i className={`h-2 w-2 rounded-full ${r.status === 'resolved' ? 'bg-slate-500' : colors[r.priority]}`} />{r.status === 'resolved' ? 'Resolved' : priorityLabels[r.priority]}</span></td>
                   <td className="font-mono text-[11px] text-slate-400">{r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}</td>
                 </tr>)}</tbody>
               </table>
@@ -236,7 +236,7 @@ function CommunityDashboard() {
             )}
           </div>
         </div>
-        <div className="flex items-start gap-2 text-xs text-slate-400"><ShieldAlert size={17} className="mt-0.5 shrink-0 text-amber-400"/>
+        <div className="flex items-start gap-2 text-xs text-slate-400"><ShieldAlert size={17} className="mt-0.5 shrink-0 text-amber-400" />
           <span>Prototype only. No emergency service is contacted. The map pins are fictional, and donation pledges are simulated. For actual emergencies in Malaysia, call 999.</span>
         </div>
       </section>

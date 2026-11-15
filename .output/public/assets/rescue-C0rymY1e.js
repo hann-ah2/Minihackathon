@@ -1,0 +1,1 @@
+var e=[`Flood`,`Medical Assistance`,`Trapped / Rescue`,`Landslide`,`Earthquake`,`Power Outage`,`Food / Water`,`Shelter`,`Other`],t={new:`New`,assigned:`Assigned`,in_progress:`In Progress`,resolved:`Resolved`},n={P1:`Critical`,P2:`High`,P3:`Moderate`,P4:`Low`};export{n,t as r,e as t};
