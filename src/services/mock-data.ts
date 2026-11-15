@@ -1,4 +1,5 @@
 import type { EmergencyReport, MissionStatus, MissionUpdate, Priority, RescueTeam } from '@/models/rescue';
+import { supabase } from '@/lib/supabase';
 export type ReportInput = Omit<EmergencyReport, 'id' | 'priority' | 'verification_status' | 'status' | 'assigned_team_id' | 'created_at' | 'updated_at'>;
 export function provisionalPriority(input: Pick<ReportInput, 'immediate_danger' | 'category'>): Priority {
  if (input.immediate_danger === 'yes') return 'P1';
@@ -33,11 +34,24 @@ function save() { localStorage.setItem(KEY, JSON.stringify(read())); window.disp
 function report(id: string) { const r = read().reports.find(r => r.id === id); if (!r) throw new Error('Mission not found.'); return r; }
 function log(r: EmergencyReport, note: string) { read().updates.push({ id: crypto.randomUUID(), report_id: r.id, author_name: 'Demo coordinator', note, status: r.status, created_at: new Date().toISOString() }); }
 export const mockService = {
- async getReports() { return structuredClone(read().reports); },
- async createReport(input: ReportInput) {
+ async getReports(): Promise<EmergencyReport[]> {
+  if (supabase) {
+   const { data, error } = await supabase.from('rescue_reports').select('*').order('created_at', { ascending: false }).limit(500);
+   if (error) throw new Error(`Cannot load cloud reports: ${error.message}`);
+   return data as EmergencyReport[];
+  }
+  return structuredClone(read().reports);
+ },
+ async createReport(input: ReportInput): Promise<EmergencyReport> {
   if (!input.title.trim() || !input.description.trim() || !input.location_name.trim() || !Number.isInteger(input.affected_people) || input.affected_people < 1) throw new Error('Complete all required report fields.');
   const now = new Date().toISOString();
   const r: EmergencyReport = { ...input, title: input.title.trim(), id: `RG-${crypto.randomUUID().slice(0,8).toUpperCase()}`, priority: provisionalPriority(input), verification_status: 'unverified', status: 'new', assigned_team_id: null, created_at: now, updated_at: now };
+  if (supabase) {
+   const { data, error } = await supabase.from('rescue_reports').insert(r).select().single();
+   if (error) throw new Error(`Cannot save report: ${error.message}`);
+   window.dispatchEvent(new Event('rescuegrid-change'));
+   return data as EmergencyReport;
+  }
   read().reports.unshift(r); log(r, 'Resident report received. Provisional priority pending coordinator review.'); save(); return structuredClone(r);
  },
  async updateReport(id: string, updates: Partial<Pick<EmergencyReport, 'verification_status' | 'priority' | 'description'>>) { const r = report(id); Object.assign(r, updates, { updated_at: new Date().toISOString() }); log(r, 'Coordinator reviewed incident details.'); save(); },
