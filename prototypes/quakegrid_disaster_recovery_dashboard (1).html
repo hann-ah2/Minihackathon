@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuakeGrid — Rapid Earthquake Triage & Blackout Radar</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-dark: #1e293b;
+      --border-dark: #334155;
+      --text-light: #f8fafc;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Self-Contained Interactive Tactical Responder Map Canvas */
+    .map-canvas {
+      position: relative;
+      width: 100%;
+      height: 460px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #334155;
+      background-color: #0b1325;
+      background-image:
+        radial-gradient(circle at 42% 45%, rgba(239, 68, 68, 0.14) 0%, transparent 45%),
+        radial-gradient(circle at 65% 55%, rgba(168, 85, 247, 0.12) 0%, transparent 42%),
+        linear-gradient(rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.08) 1px, transparent 1px),
+        linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 80px 80px, 80px 80px, 20px 20px, 20px 20px;
+      box-shadow: inset 0 0 60px rgba(2, 6, 23, 0.85), 0 10px 30px rgba(0, 0, 0, 0.5);
+      cursor: crosshair;
+      user-select: none;
+    }
+
+    /* Zoomable Inner Stage */
+    #mapZoomStage {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      transform-origin: center center;
+      transition: transform 0.25s ease-out;
+    }
+
+    /* Tactical SVG Roads & Sector Geography Overlay */
+    .map-terrain-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.75;
+    }
+
+    /* High Concentration SOS Heat Zones */
+    .heat-zone {
+      position: absolute;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(239, 68, 68, 0.28) 0%, rgba(239, 68, 68, 0.08) 55%, transparent 75%);
+      border: 1.5px dashed rgba(239, 68, 68, 0.5);
+      pointer-events: none;
+      z-index: 4;
+      animation: heat-breathe 3s infinite ease-in-out;
+    }
+
+    /* Silent Blackout Concentration Radar Zones (Purple) */
+    .silent-zone-ring {
+      position: absolute;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.30) 0%, rgba(168, 85, 247, 0.10) 58%, transparent 76%);
+      border: 2px dashed rgba(192, 132, 252, 0.75);
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);
+      pointer-events: none;
+      z-index: 5;
+      animation: heat-breathe 2.6s infinite ease-in-out;
+    }
+
+    .silent-zone-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: rgba(59, 7, 100, 0.92);
+      border: 1px solid #c084fc;
+      color: #f3e8ff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    }
+
+    @keyframes heat-breathe {
+      0%, 100% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.75; }
+      50% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+    }
+
+    /* Glowing & Pulsing Map Pins */
+    .map-pin {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s ease;
+    }
+
+    .map-pin:hover,
+    .map-pin.active-pin {
+      transform: translate(-50%, -50%) scale(1.25);
+      z-index: 30;
+    }
+
+    /* Inner Core Dot */
+    .map-pin::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ffffff;
+      z-index: 2;
+    }
+
+    /* Expanding Pulse Ring */
+    .map-pin::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      animation: pulse-ring 1.8s infinite ease-out;
+      z-index: 1;
+    }
+
+    /* Critical Red (Fast Pulse) */
+    .map-pin.critical {
+      background-color: #ef4444;
+      box-shadow: 0 0 15px #ef4444;
+    }
+    .map-pin.critical::after {
+      background-color: #ef4444;
+      animation-duration: 1.15s;
+    }
+
+    /* High Orange */
+    .map-pin.high {
+      background-color: #f97316;
+      box-shadow: 0 0 13px #f97316;
+    }
+    .map-pin.high::after {
+      background-color: #f97316;
+      animation-duration: 1.6s;
+    }
+
+    /* Medium Yellow */
+    .map-pin.medium {
+      background-color: #eab308;
+      box-shadow: 0 0 12px #eab308;
+    }
+    .map-pin.medium::after {
+      background-color: #eab308;
+      animation-duration: 2.1s;
+    }
+
+    /* Resolved Slate */
+    .map-pin.resolved {
+      background-color: #64748b;
+      box-shadow: 0 0 8px #64748b;
+      opacity: 0.78;
+    }
+    .map-pin.resolved::after {
+      display: none;
+    }
+
+    /* Donor Supply Hub Green */
+    .map-pin.donation {
+      background-color: #22c55e;
+      box-shadow: 0 0 14px #22c55e;
+      border-radius: 6px;
+    }
+    .map-pin.donation::after {
+      background-color: #22c55e;
+      border-radius: 6px;
+      animation-duration: 2.2s;
+    }
+
+    /* Last-Ping Blackout Radar (LKL) Violet Marker */
+    .map-pin.blackout {
+      background-color: #a855f7;
+      box-shadow: 0 0 16px #a855f7;
+      border: 1.5px solid #f3e8ff;
+    }
+    .map-pin.blackout::before {
+      width: 5px;
+      height: 5px;
+      background: #faf5ff;
+    }
+    .map-pin.blackout::after {
+      background-color: #a855f7;
+      animation-duration: 1.4s;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        transform: scale(1);
+        opacity: 0.9;
+      }
+      100% {
+        transform: scale(3.6);
+        opacity: 0;
+      }
+    }
+
+    /* Interactive Hover / Click Tooltip Card */
+    .pin-tooltip {
+      position: absolute;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 230px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid #475569;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.18s ease, visibility 0.18s ease;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.75);
+      z-index: 50;
+    }
+
+    .map-pin:hover .pin-tooltip,
+    .map-pin.active-pin .pin-tooltip {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Target Crosshair Reticle Marker on Map Click */
+    .target-crosshair {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      transform: translate(-50%, -50%);
+      border: 2px dashed #38bdf8;
+      border-radius: 50%;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+      pointer-events: none;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .target-crosshair::after {
+      content: '';
+      width: 5px;
+      height: 5px;
+      background: #38bdf8;
+      border-radius: 50%;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- TOP COMMAND HEADER & KPI TELEMETRY BAR -->
+  <header class="bg-[#1e293b]/95 backdrop-blur-md border-b border-[#334155] sticky top-0 z-50 px-4 lg:px-8 py-3">
+    <div class="max-w-[1480px] mx-auto flex flex-wrap items-center justify-between gap-4">
+      <!-- Brand Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/50 flex items-center justify-center shadow-lg shadow-red-500/10">
+          <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12h4l3-9 4 18 3-9h4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-lg md:text-xl font-extrabold tracking-tight text-white">QUAKE<span class="text-red-500">GRID</span> <span class="text-slate-500 font-normal text-sm">//</span> <span class="text-purple-400 text-sm md:text-base font-bold">Seismic Triage & Blackout Radar</span></h1>
+            <span class="px-2 py-0.5 text-[10px] font-mono-tech uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40 rounded-full flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping"></span> LKL Telemetry Active
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Live Tactical SOS Mapping, Passive Device Blackout Detection & Supply Logistics — Subang Jaya / Klang Valley</p>
+        </div>
+      </div>
+
+      <!-- Top KPI Counters & Command Triggers -->
+      <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+        <div class="bg-[#0f172a] border border-red-500/40 px-3 py-1.5 rounded-lg flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-red-300">Critical SOS</div>
+            <div id="kpiCriticalAlerts" class="text-sm font-bold font-mono-tech text-red-400">2</div>
+          </div>
+        </div>
+
+        <div class="bg-[#0f172a] border border-[#334155] px-3 py-1.5 rounded-lg flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400">High/Med Active</div>
+            <div id="kpiActiveReports" class="text-sm font-bold font-mono-tech text-white">2</div>
+          </div>
+        </div>
+
+        <div class="bg-[#0f172a] border border-emerald-500/40 px-3 py-1.5 rounded-lg flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 shadow-[0_0_8px_#22c55e]"></span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-emerald-300">Supply Hubs</div>
+            <div id="kpiSupplyHubs" class="text-sm font-bold font-mono-tech text-emerald-400">5</div>
+          </div>
+        </div>
+
+        <div class="bg-[#0f172a] border border-purple-500/50 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+          <span class="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_8px_#a855f7] animate-pulse"></span>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-purple-300">Signal Lost (LKL)</div>
+            <div id="kpiSignalLost" class="text-sm font-bold font-mono-tech text-purple-400">4</div>
+          </div>
+        </div>
+
+        <button onclick="simulateSeismicBlackout()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/50 px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-purple-600/25 transition">
+          <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+          <span>Simulate Seismic Blackout</span>
+        </button>
+
+        <button onclick="simulateAftershock()" class="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/50 px-3 py-2 rounded-lg text-xs font-bold transition">
+          + Aftershock SOS
+        </button>
+
+        <button onclick="toggleSqlModal()" class="bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+          </svg>
+          <span>Live SQL Log</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOAST NOTIFICATION BANNER -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-[1000] max-w-sm bg-[#1e293b] border border-sky-500/60 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-start gap-3 transform translate-y-24 opacity-0 pointer-events-none transition-all duration-300">
+    <div id="toastIcon" class="mt-1 w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></div>
+    <div class="text-xs leading-relaxed">
+      <div id="toastTitle" class="font-bold text-white text-sm">Emergency Report Logged</div>
+      <div id="toastMessage" class="text-slate-300 mt-0.5">Pin plotted onto live Responder Map.</div>
+    </div>
+  </div>
+
+  <!-- MAIN WORKSPACE GRID -->
+  <main class="flex-1 max-w-[1480px] w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT SIDEBAR: THREE-TAB SURVIVOR, DONOR & BLACKOUT RADAR PANEL (5 Columns) -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+      <div class="bg-[#1e293b] border border-[#334155] rounded-xl shadow-xl overflow-hidden flex flex-col">
+        
+        <!-- Form Mode Switcher Tabs (3 Tabs) -->
+        <div class="grid grid-cols-3 bg-[#0f172a] p-1.5 border-b border-[#334155] gap-1">
+          <button id="tabBtnSurvivor" onclick="switchFormTab('survivor')" class="py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition bg-red-500 text-white shadow-md">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span>Survivor SOS</span>
+          </button>
+
+          <button id="tabBtnDonor" onclick="switchFormTab('donor')" class="py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition text-slate-400 hover:text-white">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            <span>Pledge Aid</span>
+          </button>
+
+          <button id="tabBtnBlackout" onclick="switchFormTab('blackout')" class="py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition text-purple-300 hover:text-white">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+            </svg>
+            <span>Blackout Radar</span>
+          </button>
+        </div>
+
+        <!-- TAB 1: SURVIVOR EMERGENCY REPORT FORM -->
+        <form id="survivorForm" onsubmit="handleSurvivorSubmit(event)" class="p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-700/70 pb-3">
+            <div>
+              <h2 class="text-base font-bold text-white">Emergency SOS & Resource Request</h2>
+              <p class="text-xs text-slate-400">Select emergency type, urgency level, and map location.</p>
+            </div>
+            <span class="text-[11px] font-mono-tech px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">Emergency_Reports</span>
+          </div>
+
+          <!-- 1. Tappable Disaster Type Buttons -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+              1. Disaster Type <span class="text-red-400">*</span>
+            </label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <button type="button" onclick="selectDisasterType('Building Collapse', 'Heavy Rescue Tools', this)" class="disaster-btn border-2 border-red-500 bg-red-500/20 text-white rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16">
+                <span class="text-base">🏢</span>
+                <span class="text-xs font-bold leading-tight">Building Collapse</span>
+              </button>
+              <button type="button" onclick="selectDisasterType('Trapped Persons', 'Medical Supplies', this)" class="disaster-btn border border-[#334155] bg-[#0f172a] hover:border-slate-500 text-slate-200 rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16">
+                <span class="text-base">🆘</span>
+                <span class="text-xs font-bold leading-tight">Trapped Persons</span>
+              </button>
+              <button type="button" onclick="selectDisasterType('Fire', 'Fire Extinguishers', this)" class="disaster-btn border border-[#334155] bg-[#0f172a] hover:border-slate-500 text-slate-200 rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16">
+                <span class="text-base">🔥</span>
+                <span class="text-xs font-bold leading-tight">Fire</span>
+              </button>
+              <button type="button" onclick="selectDisasterType('Gas Leak', 'Evacuation Transport', this)" class="disaster-btn border border-[#334155] bg-[#0f172a] hover:border-slate-500 text-slate-200 rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16">
+                <span class="text-base">⚠️</span>
+                <span class="text-xs font-bold leading-tight">Gas Leak</span>
+              </button>
+              <button type="button" onclick="selectDisasterType('Blocked Road', 'Bulldozer / Debris Clearing', this)" class="disaster-btn border border-[#334155] bg-[#0f172a] hover:border-slate-500 text-slate-200 rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16 col-span-2">
+                <span class="text-base">🚧</span>
+                <span class="text-xs font-bold leading-tight">Blocked Road</span>
+              </button>
+            </div>
+            <input type="hidden" id="inputDisasterType" value="Building Collapse" required>
+          </div>
+
+          <!-- 2. Resource Needed Selector -->
+          <div>
+            <label for="inputResourceNeeded" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              2. Resource Needed <span class="text-red-400">*</span>
+            </label>
+            <select id="inputResourceNeeded" class="w-full bg-[#0f172a] border border-[#334155] focus:border-sky-400 rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition">
+              <option value="Heavy Rescue Tools">Heavy Rescue Tools</option>
+              <option value="Medical Supplies">Medical Supplies</option>
+              <option value="Clean Water & Rations">Clean Water & Rations</option>
+              <option value="Evacuation Transport">Evacuation Transport</option>
+              <option value="Fire Extinguishers">Fire Extinguishers</option>
+              <option value="Bulldozer / Debris Clearing">Bulldozer / Debris Clearing</option>
+            </select>
+          </div>
+
+          <!-- 3. Critical Level Selector -->
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              3. Critical Level <span class="text-red-400">*</span>
+            </label>
+            <div class="grid grid-cols-3 gap-2.5">
+              <button type="button" onclick="selectCriticalLevel('Critical', this)" class="crit-btn border-2 border-red-500 bg-red-500/25 text-white py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                Critical
+              </button>
+              <button type="button" onclick="selectCriticalLevel('High', this)" class="crit-btn border border-[#334155] bg-[#0f172a] text-slate-300 hover:border-orange-500/60 py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                High
+              </button>
+              <button type="button" onclick="selectCriticalLevel('Medium', this)" class="crit-btn border border-[#334155] bg-[#0f172a] text-slate-300 hover:border-yellow-500/60 py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+                Medium
+              </button>
+            </div>
+            <input type="hidden" id="inputCriticalLevel" value="Critical">
+          </div>
+
+          <!-- 4. Sector Quick-Select OR Click-on-Map Coordinates -->
+          <div class="bg-[#0f172a] border border-[#334155] rounded-lg p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between flex-wrap gap-1">
+              <label for="inputSectorPreset" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                4. Sector Quick-Select / Map Target
+              </label>
+              <span class="text-[11px] text-sky-400 font-medium">Or click directly on map</span>
+            </div>
+            <select id="inputSectorPreset" onchange="applySectorPreset()" class="w-full bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-2 text-xs text-white outline-none">
+              <option value="42,35,3.0738,101.5970">SS15 Commercial Hub (3.0738, 101.5970)</option>
+              <option value="72,58,3.0685,101.6075">Sunway Lagoon Sector (3.0685, 101.6075)</option>
+              <option value="34,76,3.0548,101.5922">USJ 7 Transit Hub (3.0548, 101.5922)</option>
+              <option value="22,26,3.0815,101.5880">Subang Industrial Zone (3.0815, 101.5880)</option>
+              <option value="58,64,3.0652,101.6015">Bandar Sunway Campus (3.0652, 101.6015)</option>
+            </select>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label for="inputSurvivorLat" class="block text-[10px] text-slate-400 uppercase mb-0.5">Latitude</label>
+                <input type="number" step="0.0001" id="inputSurvivorLat" value="3.0738" required class="w-full bg-[#1e293b] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono-tech text-sky-300 outline-none focus:border-sky-400">
+              </div>
+              <div>
+                <label for="inputSurvivorLng" class="block text-[10px] text-slate-400 uppercase mb-0.5">Longitude</label>
+                <input type="number" step="0.0001" id="inputSurvivorLng" value="101.5970" required class="w-full bg-[#1e293b] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono-tech text-sky-300 outline-none focus:border-sky-400">
+              </div>
+            </div>
+            <input type="hidden" id="inputSurvivorTop" value="35">
+            <input type="hidden" id="inputSurvivorLeft" value="42">
+          </div>
+
+          <button type="submit" class="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-red-600/25 flex items-center justify-center gap-2 transition transform active:scale-[0.99]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Broadcast Emergency SOS to Map
+          </button>
+        </form>
+
+        <!-- TAB 2: DONOR RESOURCE PLEDGE FORM -->
+        <form id="donorForm" onsubmit="handleDonorSubmit(event)" class="p-5 space-y-4 hidden">
+          <div class="flex items-center justify-between border-b border-slate-700/70 pb-3">
+            <div>
+              <h2 class="text-base font-bold text-white">Pledge Community Aid Supplies</h2>
+              <p class="text-xs text-slate-400">Deploy supplies or rescue transport to a Safe Zone hub.</p>
+            </div>
+            <span class="text-[11px] font-mono-tech px-2 py-1 rounded bg-slate-800 text-emerald-400 border border-slate-700">Donations</span>
+          </div>
+
+          <div>
+            <label for="inputDonorCategory" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              1. Item Category <span class="text-emerald-400">*</span>
+            </label>
+            <select id="inputDonorCategory" onchange="syncDonorUnit()" class="w-full bg-[#0f172a] border border-[#334155] focus:border-emerald-400 rounded-lg px-3.5 py-2.5 text-sm text-white outline-none">
+              <option value="Clean Water" data-unit="Cartons">💧 Clean Water</option>
+              <option value="Medical" data-unit="First Aid Kits">🩺 Medical</option>
+              <option value="Shelter" data-unit="Blankets">⛺ Shelter</option>
+              <option value="Logistics" data-unit="4x4 Trucks">🛻 Logistics</option>
+              <option value="Power" data-unit="Power Banks">🔋 Power</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="inputDonorQty" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                2. Quantity <span class="text-emerald-400">*</span>
+              </label>
+              <input type="number" id="inputDonorQty" min="1" max="10000" value="50" required class="w-full bg-[#0f172a] border border-[#334155] focus:border-emerald-400 rounded-lg px-3.5 py-2 text-sm text-white outline-none font-mono-tech">
+            </div>
+            <div>
+              <label for="inputDonorUnit" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                Unit <span class="text-emerald-400">*</span>
+              </label>
+              <input type="text" id="inputDonorUnit" value="Cartons" required class="w-full bg-[#0f172a] border border-[#334155] focus:border-emerald-400 rounded-lg px-3.5 py-2 text-sm text-slate-200 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label for="inputDonorName" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+              3. Donor Name / Organization <span class="text-emerald-400">*</span>
+            </label>
+            <input type="text" id="inputDonorName" value="Subang Relief Volunteers" required class="w-full bg-[#0f172a] border border-[#334155] focus:border-emerald-400 rounded-lg px-3.5 py-2 text-sm text-white outline-none">
+          </div>
+
+          <div class="bg-[#0f172a] border border-[#334155] rounded-lg p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label for="inputDonorSafeZone" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+                4. Safe Zone Dropoff Location
+              </label>
+              <span class="text-[11px] text-emerald-400 font-medium">Or click map</span>
+            </div>
+            <select id="inputDonorSafeZone" onchange="syncDonorZoneCoords()" class="w-full bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-2 text-xs text-white outline-none">
+              <option value="North Sector Safe Zone" data-top="22" data-left="35" data-lat="3.0820" data-lng="101.5940">North Sector Safe Zone (3.0820, 101.5940)</option>
+              <option value="East Sector Safe Zone" data-top="42" data-left="80" data-lat="3.0745" data-lng="101.6065">East Sector Safe Zone (3.0745, 101.6065)</option>
+              <option value="South Sector Safe Zone" data-top="78" data-left="45" data-lat="3.0650" data-lng="101.5960">South Sector Safe Zone (3.0650, 101.5960)</option>
+              <option value="West Sector Safe Zone" data-top="48" data-left="16" data-lat="3.0725" data-lng="101.5845">West Sector Safe Zone (3.0725, 101.5845)</option>
+            </select>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label for="inputDonorLat" class="block text-[10px] text-slate-400 uppercase mb-0.5">Dropoff Latitude</label>
+                <input type="number" step="0.0001" id="inputDonorLat" value="3.0820" required class="w-full bg-[#1e293b] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono-tech text-emerald-300 outline-none focus:border-emerald-400">
+              </div>
+              <div>
+                <label for="inputDonorLng" class="block text-[10px] text-slate-400 uppercase mb-0.5">Dropoff Longitude</label>
+                <input type="number" step="0.0001" id="inputDonorLng" value="101.5940" required class="w-full bg-[#1e293b] border border-slate-700 rounded px-2.5 py-1 text-xs font-mono-tech text-emerald-300 outline-none focus:border-emerald-400">
+              </div>
+            </div>
+            <input type="hidden" id="inputDonorTop" value="22">
+            <input type="hidden" id="inputDonorLeft" value="35">
+          </div>
+
+          <button type="submit" class="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition transform active:scale-[0.99]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Register Aid & Plot Supply Hub Pin
+          </button>
+        </form>
+
+        <!-- TAB 3: LAST-PING BLACKOUT RADAR PANEL -->
+        <div id="blackoutPanel" class="p-5 space-y-4 hidden">
+          <div class="flex items-center justify-between border-b border-slate-700/70 pb-3">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <span>Last-Ping Blackout Radar</span>
+              </h2>
+              <p class="text-xs text-slate-400">Auto-detects trapped victims whose 60s GPS heartbeat flatlined during tremors.</p>
+            </div>
+            <span class="text-[11px] font-mono-tech px-2 py-1 rounded bg-purple-950/70 text-purple-300 border border-purple-500/40">User_Heartbeats</span>
+          </div>
+
+          <div class="bg-[#0f172a] border border-purple-500/30 rounded-lg p-3 text-xs text-slate-300 leading-relaxed">
+            <strong class="text-purple-300">Passive Telemetry Rule:</strong> Devices transmit low-power GPS pings every <span class="font-mono-tech text-white">60s</span>. When seismic shockwaves sever cell towers or trap users under rubble, QuakeGrid clusters their <strong>Last Known Locations (LKL)</strong> automatically—even without a manual SOS form.
+          </div>
+
+          <!-- Trigger & Reset Controls -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" onclick="simulateSeismicBlackout()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs shadow-lg shadow-purple-600/25 flex items-center justify-center gap-1.5 transition">
+              <span>⚡ Trigger Seismic Blackout</span>
+            </button>
+            <button type="button" onclick="resetBlackoutHeartbeats()" class="bg-[#0f172a] hover:bg-slate-800 text-slate-300 border border-slate-600 font-semibold py-2.5 px-3 rounded-xl text-xs transition">
+              ↺ Reset Heartbeats
+            </button>
+          </div>
+
+          <!-- Detected Silent Concentration Zones List -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-purple-300">Detected Silent Concentration Zones</span>
+              <span id="silentZoneCountBadge" class="text-[11px] font-mono-tech text-slate-400">1 Active Zone</span>
+            </div>
+            <div id="silentZonesList" class="space-y-2 max-h-44 overflow-y-auto pr-1">
+              <!-- Populated dynamically via JS -->
+            </div>
+          </div>
+
+          <!-- Disconnected Devices Feed -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-300">Recent Signal-Lost Pings (LKL)</span>
+              <span id="lklDeviceSummary" class="text-[11px] font-mono-tech text-purple-400">4 Devices Offline</span>
+            </div>
+            <div id="lklMiniList" class="bg-[#0f172a] border border-[#334155] rounded-lg divide-y divide-slate-800 max-h-36 overflow-y-auto text-[11px] font-mono-tech">
+              <!-- Populated dynamically via JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT WORKSPACE: TACTICAL RESPONDER RADAR MAP & LIVE SQL TABLES (7 Columns) -->
+    <section class="lg:col-span-7 flex flex-col gap-5">
+
+      <!-- INTERACTIVE RESPONDER MAP CARD -->
+      <div class="bg-[#1e293b] border border-[#334155] rounded-xl p-4 shadow-xl space-y-3">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-bold text-white">Live Tactical Responder Radar</h2>
+            <span class="text-[11px] font-mono-tech px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/40">
+              Subang Jaya Sector Grid
+            </span>
+          </div>
+
+          <!-- Layer Toggles & Zoom Controls -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button id="btnHeatmapToggle" onclick="toggleHeatmapZones()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-red-500/50 bg-red-500/15 text-red-300 hover:bg-red-500/25 transition flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-red-500"></span>
+              <span id="heatmapToggleLabel">SOS Zones: ON</span>
+            </button>
+
+            <button id="btnBlackoutLayerToggle" onclick="toggleBlackoutRadarLayer()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-purple-500/50 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+              <span id="blackoutLayerLabel">Blackout Radar: ON</span>
+            </button>
+
+            <div class="inline-flex rounded-lg bg-[#0f172a] border border-[#334155] overflow-hidden">
+              <button onclick="adjustMapZoom(0.2)" class="px-2.5 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800 transition" title="Zoom In">+</button>
+              <button onclick="adjustMapZoom(-0.2)" class="px-2.5 py-1 text-xs font-bold text-slate-200 hover:bg-slate-800 border-l border-[#334155] transition" title="Zoom Out">−</button>
+              <button onclick="resetMapZoom()" class="px-2 py-1 text-[11px] font-mono-tech text-sky-400 hover:bg-slate-800 border-l border-[#334155] transition" title="Reset Zoom">100%</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-slate-700/60">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-[11px] font-mono-tech uppercase text-slate-400 mr-1">Filter:</span>
+            <button onclick="filterMarkers('all', this)" class="filter-pill ring-2 ring-sky-400 bg-sky-500 text-slate-950 font-bold text-xs px-2.5 py-1 rounded-full transition">
+              All
+            </button>
+            <button onclick="filterMarkers('critical', this)" class="filter-pill bg-[#0f172a] hover:bg-slate-800 text-red-400 border border-red-500/40 font-semibold text-xs px-2.5 py-1 rounded-full transition flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-red-500"></span> Critical
+            </button>
+            <button onclick="filterMarkers('high', this)" class="filter-pill bg-[#0f172a] hover:bg-slate-800 text-orange-400 border border-orange-500/40 font-semibold text-xs px-2.5 py-1 rounded-full transition flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-orange-500"></span> High
+            </button>
+            <button onclick="filterMarkers('medium', this)" class="filter-pill bg-[#0f172a] hover:bg-slate-800 text-yellow-300 border border-yellow-500/40 font-semibold text-xs px-2.5 py-1 rounded-full transition flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-yellow-400"></span> Medium
+            </button>
+            <button onclick="filterMarkers('donation', this)" class="filter-pill bg-[#0f172a] hover:bg-slate-800 text-emerald-400 border border-emerald-500/40 font-semibold text-xs px-2.5 py-1 rounded-full transition flex items-center gap-1">
+              <span class="w-2 h-2 rounded-sm bg-emerald-500"></span> Supply Hubs
+            </button>
+            <button onclick="filterMarkers('blackout', this)" class="filter-pill bg-[#0f172a] hover:bg-slate-800 text-purple-300 border border-purple-500/50 font-semibold text-xs px-2.5 py-1 rounded-full transition flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-purple-400"></span> Blackout (LKL)
+            </button>
+          </div>
+          <span class="text-[11px] text-slate-400">Click anywhere on radar to set GPS pin</span>
+        </div>
+
+        <!-- SELF-CONTAINED TACTICAL RADAR MAP -->
+        <div class="map-canvas" id="responderMap" onclick="handleMapClick(event)">
+          <div id="mapZoomStage">
+            <!-- Tactical Vector Highways, Klang River & Sector Landmarks -->
+            <svg class="map-terrain-svg" viewBox="0 0 1000 500" preserveAspectRatio="none">
+              <!-- Klang River / Waterway -->
+              <path d="M 120 0 Q 190 140 150 260 T 210 500" fill="none" stroke="#0ea5e9" stroke-width="14" stroke-opacity="0.16" />
+              <path d="M 120 0 Q 190 140 150 260 T 210 500" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.35" stroke-dasharray="8 6" />
+              <!-- Federal Highway & LDP Arteries -->
+              <path d="M 0 130 L 1000 175" fill="none" stroke="#475569" stroke-width="6" stroke-opacity="0.45" />
+              <path d="M 0 130 L 1000 175" fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-opacity="0.45" stroke-dasharray="10 8" />
+              <path d="M 410 0 L 455 500" fill="none" stroke="#475569" stroke-width="6" stroke-opacity="0.45" />
+              <path d="M 650 0 L 615 500" fill="none" stroke="#475569" stroke-width="5" stroke-opacity="0.4" />
+              <path d="M 0 365 L 1000 330" fill="none" stroke="#475569" stroke-width="5" stroke-opacity="0.4" />
+              <!-- Tactical Radar Rings -->
+              <circle cx="450" cy="240" r="110" fill="none" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.16" />
+              <circle cx="450" cy="240" r="210" fill="none" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.12" stroke-dasharray="4 6" />
+              <!-- Sector Labels -->
+              <text x="210" y="95" fill="#64748b" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">SUBANG INDUSTRIAL ZONE</text>
+              <text x="465" y="155" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">SS15 COMMERCIAL HUB</text>
+              <text x="680" y="295" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">BANDAR SUNWAY SECTOR</text>
+              <text x="255" y="425" fill="#94a3b8" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">USJ 7 TRANSIT HUB</text>
+            </svg>
+
+            <!-- High-Concentration SOS Heat Zones Layer -->
+            <div id="sosHeatZonesLayer">
+              <div class="heat-zone" style="top: 38%; left: 41%; width: 170px; height: 170px;"></div>
+              <div class="heat-zone" style="top: 52%; left: 38%; width: 140px; height: 140px;"></div>
+            </div>
+
+            <!-- Silent Blackout Concentration Zones Layer -->
+            <div id="silentZonesMapLayer"></div>
+
+            <!-- Target Crosshair Reticle -->
+            <div id="targetCrosshair" class="target-crosshair" style="top: 35%; left: 42%;"></div>
+
+            <!-- Dynamic Pins Container -->
+            <div id="mapPinsLayer"></div>
+          </div>
+
+          <!-- Floating Legend Card (Bottom Right) -->
+          <div class="absolute bottom-3 right-3 bg-[#0f172a]/92 backdrop-blur-md border border-[#334155] p-2.5 rounded-lg text-[11px] z-40 shadow-lg pointer-events-none">
+            <div class="font-bold text-slate-200 mb-1 uppercase tracking-wider text-[10px]">Pin Legend</div>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-slate-300">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_6px_#ef4444]"></span>
+                <span>Critical SOS</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                <span>High Priority</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+                <span>Medium</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>
+                <span>Supply Hub</span>
+              </div>
+              <div class="flex items-center gap-1.5 col-span-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_6px_#a855f7]"></span>
+                <span class="text-purple-300 font-semibold">Last-Ping Blackout (LKL)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE DATABASE TABLES (TABBED FEED) -->
+      <div class="bg-[#1e293b] border border-[#334155] rounded-xl shadow-xl overflow-hidden flex-1 flex flex-col">
+        <div class="flex items-center justify-between bg-[#0f172a] px-4 py-2.5 border-b border-[#334155] flex-wrap gap-2">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button id="feedTabReports" onclick="switchFeedTab('reports')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 transition">
+              Emergency_Reports (<span id="badgeReportCount">5</span>)
+            </button>
+            <button id="feedTabDonations" onclick="switchFeedTab('donations')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white border border-transparent transition">
+              Donations (<span id="badgeDonationCount">5</span>)
+            </button>
+            <button id="feedTabHeartbeats" onclick="switchFeedTab('heartbeats')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-purple-300 border border-transparent transition">
+              User_Heartbeats (<span id="badgeHeartbeatCount">4</span>)
+            </button>
+          </div>
+          <span class="text-[11px] font-mono-tech text-emerald-400 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Map-SQL Two-Way Sync
+          </span>
+        </div>
+
+        <!-- TABLE 1: Emergency_Reports -->
+        <div id="feedPanelReports" class="p-4 overflow-x-auto max-h-[280px] overflow-y-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-[#334155] text-[11px] font-mono-tech uppercase text-slate-400">
+                <th class="pb-2 pr-3">Report_ID</th>
+                <th class="pb-2 px-3">Disaster_Type</th>
+                <th class="pb-2 px-3">Resource_Needed</th>
+                <th class="pb-2 px-3">Critical_Level</th>
+                <th class="pb-2 px-3">GPS (Lat, Lng)</th>
+                <th class="pb-2 px-3">Status</th>
+                <th class="pb-2 pl-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="reportsTableBody" class="divide-y divide-slate-800 text-xs">
+              <!-- Populated dynamically via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TABLE 2: Donations -->
+        <div id="feedPanelDonations" class="p-4 overflow-x-auto max-h-[280px] overflow-y-auto hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-[#334155] text-[11px] font-mono-tech uppercase text-slate-400">
+                <th class="pb-2 pr-3">Donation_ID</th>
+                <th class="pb-2 px-3">Item_Category</th>
+                <th class="pb-2 px-3">Quantity</th>
+                <th class="pb-2 px-3">Donor_Name</th>
+                <th class="pb-2 px-3">Dropoff_Location</th>
+                <th class="pb-2 pl-3 text-right">Status</th>
+              </tr>
+            </thead>
+            <tbody id="donationsTableBody" class="divide-y divide-slate-800 text-xs">
+              <!-- Populated dynamically via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- TABLE 3: User_Heartbeats (Last Known Location Telemetry) -->
+        <div id="feedPanelHeartbeats" class="p-4 overflow-x-auto max-h-[280px] overflow-y-auto hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-[#334155] text-[11px] font-mono-tech uppercase text-slate-400">
+                <th class="pb-2 pr-3">Device_ID</th>
+                <th class="pb-2 px-3">Sector / Cluster</th>
+                <th class="pb-2 px-3">Last_Lat, Last_Lng</th>
+                <th class="pb-2 px-3">Battery_Pct</th>
+                <th class="pb-2 px-3">Last_Ping</th>
+                <th class="pb-2 pl-3 text-right">Connection_Status</th>
+              </tr>
+            </thead>
+            <tbody id="heartbeatsTableBody" class="divide-y divide-slate-800 text-xs">
+              <!-- Populated dynamically via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- LIVE SQL TRANSACTION LOG MODAL -->
+  <div id="sqlModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1100] hidden items-center justify-center p-4">
+    <div class="bg-[#1e293b] border border-[#334155] rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-3.5 bg-[#0f172a] border-b border-[#334155]">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+          <h3 class="text-sm font-bold font-mono-tech text-white">Live SQL Schema & Backend Transaction Log</h3>
+        </div>
+        <button onclick="toggleSqlModal()" class="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded">✕ Close</button>
+      </div>
+      <div class="p-5 space-y-3">
+        <p class="text-xs text-slate-300">Database schema + automated Blackout Radar detection queries & live inserts:</p>
+        <pre id="sqlCodeLog" class="bg-[#0f172a] border border-slate-700 rounded-xl p-4 text-[11px] font-mono-tech text-emerald-300 overflow-x-auto max-h-80 leading-relaxed">-- QuakeGrid Geospatial SQL Schema (Subang Jaya / Klang Valley)
+CREATE TABLE Emergency_Reports (
+    Report_ID INT PRIMARY KEY,
+    Disaster_Type VARCHAR(50),
+    Resource_Needed VARCHAR(100),
+    Critical_Level VARCHAR(20),
+    Latitude DECIMAL(10, 6),
+    Longitude DECIMAL(10, 6),
+    Status VARCHAR(20) DEFAULT 'Pending'
+);
+
+CREATE TABLE Donations (
+    Donation_ID INT PRIMARY KEY,
+    Item_Category VARCHAR(50),
+    Quantity INT,
+    Unit VARCHAR(20),
+    Donor_Name VARCHAR(50),
+    Dropoff_Location VARCHAR(100),
+    Status VARCHAR(20) DEFAULT 'Pledged'
+);
+
+-- TABLE 3: Passive Device Heartbeats (Last-Ping Blackout Radar)
+CREATE TABLE User_Heartbeats (
+    Device_ID VARCHAR(50) PRIMARY KEY,
+    Last_Lat DECIMAL(10, 6),
+    Last_Lng DECIMAL(10, 6),
+    Battery_Pct INT,
+    Last_Ping TIMESTAMP,
+    Connection_Status VARCHAR(20) DEFAULT 'Online' -- 'Online' | 'Signal Lost'
+);
+
+-- Automated Seismic Blackout Clustering Query:
+SELECT Device_ID, Last_Lat, Last_Lng, Battery_Pct, Last_Ping
+FROM User_Heartbeats
+WHERE Connection_Status = 'Signal Lost'
+  AND Last_Ping >= NOW() - INTERVAL 10 MINUTE;</pre>
+        <div class="flex justify-end gap-2">
+          <button onclick="copySqlLog()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition">
+            Copy SQL Queries
+          </button>
+          <button onclick="toggleSqlModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2 rounded-lg transition">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    // =========================================================================
+    // 1. SQL DUMMY DATA (Pre-populated with Map % Coordinates + GPS Telemetry)
+    // =========================================================================
+    let emergencyReports = [
+      {
+        id: 101,
+        disasterType: 'Building Collapse',
+        resourceNeeded: 'Heavy Rescue Tools',
+        level: 'Critical',
+        lat: 3.0738,
+        lng: 101.5970,
+        top: 36,
+        left: 43,
+        status: 'Pending'
+      },
+      {
+        id: 102,
+        disasterType: 'Blocked Road',
+        resourceNeeded: 'Bulldozer / Debris Clearing',
+        level: 'Medium',
+        lat: 3.0755,
+        lng: 101.6010,
+        top: 58,
+        left: 66,
+        status: 'In Progress'
+      },
+      {
+        id: 103,
+        disasterType: 'Trapped Persons',
+        resourceNeeded: 'Medical Supplies',
+        level: 'Critical',
+        lat: 3.0690,
+        lng: 101.5925,
+        top: 51,
+        left: 38,
+        status: 'Pending'
+      },
+      {
+        id: 104,
+        disasterType: 'Gas Leak',
+        resourceNeeded: 'Evacuation Transport',
+        level: 'High',
+        lat: 3.0712,
+        lng: 101.5880,
+        top: 66,
+        left: 25,
+        status: 'Resolved'
+      },
+      {
+        id: 105,
+        disasterType: 'Fire',
+        resourceNeeded: 'Fire Extinguishers / Water',
+        level: 'High',
+        lat: 3.0801,
+        lng: 101.5999,
+        top: 24,
+        left: 72,
+        status: 'Pending'
+      }
+    ];
+
+    let communityDonations = [
+      {
+        id: 501,
+        category: 'Clean Water',
+        quantity: 100,
+        unit: 'Cartons',
+        donorName: 'Local Community Center',
+        safeZone: 'North Sector Safe Zone',
+        lat: 3.0820,
+        lng: 101.5940,
+        top: 22,
+        left: 35,
+        status: 'Received'
+      },
+      {
+        id: 502,
+        category: 'Medical',
+        quantity: 25,
+        unit: 'First Aid Kits',
+        donorName: 'Sunway Pharmacy',
+        safeZone: 'East Sector Safe Zone',
+        lat: 3.0745,
+        lng: 101.6065,
+        top: 42,
+        left: 80,
+        status: 'Pledged'
+      },
+      {
+        id: 503,
+        category: 'Shelter',
+        quantity: 50,
+        unit: 'Blankets',
+        donorName: 'Ali',
+        safeZone: 'South Sector Safe Zone',
+        lat: 3.0650,
+        lng: 101.5960,
+        top: 78,
+        left: 45,
+        status: 'Dispatched'
+      },
+      {
+        id: 504,
+        category: 'Logistics',
+        quantity: 2,
+        unit: '4x4 Trucks',
+        donorName: 'Ahmad',
+        safeZone: 'Mobile Response Unit',
+        lat: 3.0785,
+        lng: 101.5890,
+        top: 32,
+        left: 24,
+        status: 'Received'
+      },
+      {
+        id: 505,
+        category: 'Power',
+        quantity: 30,
+        unit: 'Power Banks',
+        donorName: 'Tech Store Sdn Bhd',
+        safeZone: 'West Sector Safe Zone',
+        lat: 3.0725,
+        lng: 101.5845,
+        top: 48,
+        left: 16,
+        status: 'Pledged'
+      }
+    ];
+
+    // TABLE 3: Passive Device Heartbeats (Last Known Location Tracking)
+    const INITIAL_HEARTBEATS = [
+      {
+        deviceId: 'DEV-SJ-8812',
+        clusterId: 'ZONE-ALPHA',
+        sectorName: 'SS15 Commercial Block',
+        lat: 3.0744,
+        lng: 101.5962,
+        top: 32,
+        left: 48,
+        batteryPct: 64,
+        lastPing: '12:14:08',
+        connectionStatus: 'Signal Lost'
+      },
+      {
+        deviceId: 'DEV-SJ-4091',
+        clusterId: 'ZONE-ALPHA',
+        sectorName: 'SS15 Commercial Block',
+        lat: 3.0749,
+        lng: 101.5973,
+        top: 36,
+        left: 52,
+        batteryPct: 41,
+        lastPing: '12:14:11',
+        connectionStatus: 'Signal Lost'
+      },
+      {
+        deviceId: 'DEV-SJ-7720',
+        clusterId: 'ZONE-ALPHA',
+        sectorName: 'SS15 Commercial Block',
+        lat: 3.0736,
+        lng: 101.5958,
+        top: 40,
+        left: 47,
+        batteryPct: 78,
+        lastPing: '12:14:12',
+        connectionStatus: 'Signal Lost'
+      },
+      {
+        deviceId: 'DEV-SJ-1934',
+        clusterId: 'ZONE-ALPHA',
+        sectorName: 'SS15 Commercial Block',
+        lat: 3.0741,
+        lng: 101.5968,
+        top: 35,
+        left: 55,
+        batteryPct: 52,
+        lastPing: '12:14:15',
+        connectionStatus: 'Signal Lost'
+      }
+    ];
+
+    let userHeartbeats = JSON.parse(JSON.stringify(INITIAL_HEARTBEATS));
+    let dispatchedBlackoutZones = {};
+
+    let nextReportId = 106;
+    let nextDonationId = 506;
+    let activeFormMode = 'survivor'; // 'survivor', 'donor', or 'blackout'
+    let activeFilter = 'all';
+    let heatmapEnabled = true;
+    let blackoutLayerEnabled = true;
+    let currentZoom = 1.0;
+
+    // =========================================================================
+    // 2. COMPUTE SILENT BLACKOUT CONCENTRATION CLUSTERS
+    // =========================================================================
+    function computeSilentConcentrationClusters() {
+      const groups = {};
+      userHeartbeats.forEach(dev => {
+        if (dev.connectionStatus !== 'Signal Lost') return;
+        if (!groups[dev.clusterId]) {
+          groups[dev.clusterId] = {
+            clusterId: dev.clusterId,
+            sectorName: dev.sectorName,
+            devices: [],
+            sumLat: 0,
+            sumLng: 0,
+            sumTop: 0,
+            sumLeft: 0
+          };
+        }
+        groups[dev.clusterId].devices.push(dev);
+        groups[dev.clusterId].sumLat += dev.lat;
+        groups[dev.clusterId].sumLng += dev.lng;
+        groups[dev.clusterId].sumTop += dev.top;
+        groups[dev.clusterId].sumLeft += dev.left;
+      });
+
+      return Object.values(groups).map(g => {
+        const count = g.devices.length;
+        return {
+          clusterId: g.clusterId,
+          sectorName: g.sectorName,
+          count,
+          centerLat: +(g.sumLat / count).toFixed(4),
+          centerLng: +(g.sumLng / count).toFixed(4),
+          centerTop: +(g.sumTop / count).toFixed(1),
+          centerLeft: +(g.sumLeft / count).toFixed(1),
+          sarDispatched: !!dispatchedBlackoutZones[g.clusterId]
+        };
+      });
+    }
+
+    // =========================================================================
+    // 3. RENDER ALL PINS & CONCENTRATION RINGS ON THE TACTICAL MAP
+    // =========================================================================
+    function renderMapPins() {
+      const pinsLayer = document.getElementById('mapPinsLayer');
+      pinsLayer.innerHTML = '';
+
+      // 1. Emergency Report Pins
+      emergencyReports.forEach(report => {
+        const levelKey = report.level.toLowerCase();
+        if (activeFilter !== 'all' && activeFilter !== levelKey) return;
+
+        const pinClass = report.status === 'Resolved' ? 'resolved' : levelKey;
+        const badgeColor =
+          report.level === 'Critical'
+            ? 'bg-red-500 text-white'
+            : report.level === 'High'
+            ? 'bg-orange-500 text-white'
+            : 'bg-yellow-400 text-slate-950';
+
+        const pin = document.createElement('div');
+        pin.id = `pin-report-${report.id}`;
+        pin.className = `map-pin ${pinClass}`;
+        pin.style.top = report.top + '%';
+        pin.style.left = report.left + '%';
+
+        pin.onclick = e => {
+          e.stopPropagation();
+          togglePinTooltip(pin);
+        };
+
+        pin.innerHTML = `
+          <div class="pin-tooltip">
+            <div class="flex items-center justify-between mb-1">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${badgeColor}">${report.level}</span>
+              <span class="font-mono-tech text-[10px] text-slate-400">#${report.id}</span>
+            </div>
+            <div class="font-bold text-white text-xs">${report.disasterType}</div>
+            <div class="text-slate-300 text-[11px] mt-0.5">Need: <strong>${report.resourceNeeded}</strong></div>
+            <div class="font-mono-tech text-[10px] text-slate-400 mt-1">GPS: ${report.lat.toFixed(4)}, ${report.lng.toFixed(4)}</div>
+            <div class="text-[10px] text-sky-400 font-semibold mt-0.5">Status: ${report.status}</div>
+            <button type="button" onclick="event.stopPropagation(); cycleReportStatus(${report.id})" class="mt-2 w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-1 px-2 rounded text-[10px] transition">
+              ${report.status === 'Pending' ? 'Dispatch Rescue' : report.status === 'In Progress' ? 'Mark Resolved' : 'Re-Open'}
+            </button>
+          </div>
+        `;
+        pinsLayer.appendChild(pin);
+      });
+
+      // 2. Donor Supply Hub Pins
+      communityDonations.forEach(donation => {
+        if (activeFilter !== 'all' && activeFilter !== 'donation') return;
+
+        const pin = document.createElement('div');
+        pin.id = `pin-donation-${donation.id}`;
+        pin.className = 'map-pin donation';
+        pin.style.top = donation.top + '%';
+        pin.style.left = donation.left + '%';
+
+        pin.onclick = e => {
+          e.stopPropagation();
+          togglePinTooltip(pin);
+        };
+
+        pin.innerHTML = `
+          <div class="pin-tooltip">
+            <div class="flex items-center justify-between mb-1">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-500 text-slate-950">SUPPLY HUB</span>
+              <span class="font-mono-tech text-[10px] text-slate-400">#${donation.id}</span>
+            </div>
+            <div class="font-bold text-white text-xs">${donation.category}: ${donation.quantity} ${donation.unit}</div>
+            <div class="text-slate-300 text-[11px] mt-0.5">Hub: <strong>${donation.safeZone}</strong></div>
+            <div class="text-slate-400 text-[10px] mt-0.5">Donor: ${donation.donorName}</div>
+            <div class="font-mono-tech text-[10px] text-emerald-400 mt-1">GPS: ${donation.lat.toFixed(4)}, ${donation.lng.toFixed(4)}</div>
+          </div>
+        `;
+        pinsLayer.appendChild(pin);
+      });
+
+      // 3. Last-Ping Blackout Radar (LKL) Violet Pins
+      if (blackoutLayerEnabled) {
+        userHeartbeats.forEach(dev => {
+          if (dev.connectionStatus !== 'Signal Lost') return;
+          if (activeFilter !== 'all' && activeFilter !== 'blackout') return;
+
+          const pin = document.createElement('div');
+          pin.id = `pin-lkl-${dev.deviceId}`;
+          pin.className = 'map-pin blackout';
+          pin.style.top = dev.top + '%';
+          pin.style.left = dev.left + '%';
+
+          pin.onclick = e => {
+            e.stopPropagation();
+            togglePinTooltip(pin);
+          };
+
+          pin.innerHTML = `
+            <div class="pin-tooltip" style="border-color: #a855f7;">
+              <div class="flex items-center justify-between mb-1">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase bg-purple-600 text-white">SIGNAL LOST (LKL)</span>
+                <span class="font-mono-tech text-[10px] text-purple-300">${dev.clusterId}</span>
+              </div>
+              <div class="font-bold text-white text-xs font-mono-tech">${dev.deviceId}</div>
+              <div class="text-slate-300 text-[11px] mt-0.5">Sector: <strong>${dev.sectorName}</strong></div>
+              <div class="font-mono-tech text-[10px] text-slate-400 mt-0.5">Last Ping: ${dev.lastPing} • 🔋${dev.batteryPct}%</div>
+              <div class="font-mono-tech text-[10px] text-purple-300 mt-0.5">LKL: ${dev.lat.toFixed(4)}, ${dev.lng.toFixed(4)}</div>
+            </div>
+          `;
+          pinsLayer.appendChild(pin);
+        });
+      }
+
+      renderSilentConcentrationZones();
+    }
+
+    /**
+     * Renders automatic violet Silent Concentration Rings around disconnected clusters
+     */
+    function renderSilentConcentrationZones() {
+      const layer = document.getElementById('silentZonesMapLayer');
+      layer.innerHTML = '';
+      if (!blackoutLayerEnabled) return;
+
+      const clusters = computeSilentConcentrationClusters();
+      clusters.forEach(c => {
+        const sizePx = Math.min(230, 125 + c.count * 16);
+        const ring = document.createElement('div');
+        ring.className = 'silent-zone-ring';
+        ring.style.top = c.centerTop + '%';
+        ring.style.left = c.centerLeft + '%';
+        ring.style.width = sizePx + 'px';
+        ring.style.height = sizePx + 'px';
+        ring.innerHTML = `
+          <div class="silent-zone-badge">
+            ⚡ SILENT ZONE: ${c.count} Devices Lost (${c.sectorName})
+          </div>
+        `;
+        layer.appendChild(ring);
+      });
+    }
+
+    function togglePinTooltip(targetPin) {
+      const wasActive = targetPin.classList.contains('active-pin');
+      document.querySelectorAll('.map-pin').forEach(p => p.classList.remove('active-pin'));
+      if (!wasActive) {
+        targetPin.classList.add('active-pin');
+      }
+    }
+
+    function focusPinOnMap(pinElementId) {
+      document.querySelectorAll('.map-pin').forEach(p => p.classList.remove('active-pin'));
+      const el = document.getElementById(pinElementId);
+      if (el) {
+        el.classList.add('active-pin');
+      }
+    }
+
+    // =========================================================================
+    // 4. CLICK-ON-MAP TARGETING & ZOOM CONTROLS
+    // =========================================================================
+    function handleMapClick(event) {
+      document.querySelectorAll('.map-pin').forEach(p => p.classList.remove('active-pin'));
+
+      const mapEl = document.getElementById('responderMap');
+      const rect = mapEl.getBoundingClientRect();
+      const rawLeftPct = ((event.clientX - rect.left) / rect.width) * 100;
+      const rawTopPct = ((event.clientY - rect.top) / rect.height) * 100;
+
+      const clampedLeft = Math.max(4, Math.min(96, +rawLeftPct.toFixed(1)));
+      const clampedTop = Math.max(6, Math.min(94, +rawTopPct.toFixed(1)));
+
+      // Map percentage position to realistic Subang Jaya GPS coordinates
+      const mappedLat = +(3.0900 - (clampedTop / 100) * 0.0420).toFixed(4);
+      const mappedLng = +(101.5800 + (clampedLeft / 100) * 0.0360).toFixed(4);
+
+      const crosshair = document.getElementById('targetCrosshair');
+      crosshair.style.top = clampedTop + '%';
+      crosshair.style.left = clampedLeft + '%';
+
+      if (activeFormMode === 'donor') {
+        document.getElementById('inputDonorLat').value = mappedLat;
+        document.getElementById('inputDonorLng').value = mappedLng;
+        document.getElementById('inputDonorTop').value = clampedTop;
+        document.getElementById('inputDonorLeft').value = clampedLeft;
+      } else {
+        document.getElementById('inputSurvivorLat').value = mappedLat;
+        document.getElementById('inputSurvivorLng').value = mappedLng;
+        document.getElementById('inputSurvivorTop').value = clampedTop;
+        document.getElementById('inputSurvivorLeft').value = clampedLeft;
+      }
+    }
+
+    function adjustMapZoom(delta) {
+      currentZoom = Math.max(0.8, Math.min(2.0, +(currentZoom + delta).toFixed(1)));
+      document.getElementById('mapZoomStage').style.transform = `scale(${currentZoom})`;
+    }
+
+    function resetMapZoom() {
+      currentZoom = 1.0;
+      document.getElementById('mapZoomStage').style.transform = 'scale(1)';
+    }
+
+    // =========================================================================
+    // 5. SURVIVOR SOS & DONOR PLEDGE FORM SUBMISSIONS
+    // =========================================================================
+    function handleSurvivorSubmit(event) {
+      event.preventDefault();
+      const disasterType = document.getElementById('inputDisasterType').value;
+      const resourceNeeded = document.getElementById('inputResourceNeeded').value;
+      const level = document.getElementById('inputCriticalLevel').value;
+      const lat = parseFloat(document.getElementById('inputSurvivorLat').value);
+      const lng = parseFloat(document.getElementById('inputSurvivorLng').value);
+      const top = parseFloat(document.getElementById('inputSurvivorTop').value) || 40;
+      const left = parseFloat(document.getElementById('inputSurvivorLeft').value) || 45;
+
+      const newReport = {
+        id: nextReportId++,
+        disasterType,
+        resourceNeeded,
+        level,
+        lat: +lat.toFixed(4),
+        lng: +lng.toFixed(4),
+        top,
+        left,
+        status: 'Pending'
+      };
+
+      emergencyReports.push(newReport);
+      activeFilter = 'all';
+      renderMapPins();
+      renderTablesAndKPIs();
+      switchFeedTab('reports');
+      focusPinOnMap(`pin-report-${newReport.id}`);
+
+      appendSqlLog(
+        `INSERT INTO Emergency_Reports (Report_ID, Disaster_Type, Resource_Needed, Critical_Level, Latitude, Longitude, Status)\nVALUES (${newReport.id}, '${newReport.disasterType}', '${newReport.resourceNeeded}', '${newReport.level}', ${newReport.lat}, ${newReport.lng}, 'Pending');`
+      );
+
+      showToast(
+        `SOS #${newReport.id} Plotted on Radar`,
+        `${newReport.level} ${newReport.disasterType} (${newReport.resourceNeeded}) at (${newReport.lat}, ${newReport.lng}).`,
+        newReport.level === 'Critical' ? 'bg-red-500' : 'bg-orange-400'
+      );
+    }
+
+    function handleDonorSubmit(event) {
+      event.preventDefault();
+      const category = document.getElementById('inputDonorCategory').value;
+      const quantity = parseInt(document.getElementById('inputDonorQty').value, 10) || 1;
+      const unit = document.getElementById('inputDonorUnit').value.trim() || 'Units';
+      const donorName = document.getElementById('inputDonorName').value.trim() || 'Anonymous Donor';
+      const safeZone = document.getElementById('inputDonorSafeZone').value;
+      const lat = parseFloat(document.getElementById('inputDonorLat').value);
+      const lng = parseFloat(document.getElementById('inputDonorLng').value);
+      const top = parseFloat(document.getElementById('inputDonorTop').value) || 30;
+      const left = parseFloat(document.getElementById('inputDonorLeft').value) || 60;
+
+      const newDonation = {
+        id: nextDonationId++,
+        category,
+        quantity,
+        unit,
+        donorName,
+        safeZone,
+        lat: +lat.toFixed(4),
+        lng: +lng.toFixed(4),
+        top,
+        left,
+        status: 'Pledged'
+      };
+
+      communityDonations.push(newDonation);
+      activeFilter = 'all';
+      renderMapPins();
+      renderTablesAndKPIs();
+      switchFeedTab('donations');
+      focusPinOnMap(`pin-donation-${newDonation.id}`);
+
+      appendSqlLog(
+        `INSERT INTO Donations (Donation_ID, Item_Category, Quantity, Unit, Donor_Name, Dropoff_Location, Status)\nVALUES (${newDonation.id}, '${newDonation.category}', ${newDonation.quantity}, '${newDonation.unit}', '${newDonation.donorName}', '${newDonation.safeZone}', 'Pledged');`
+      );
+
+      showToast(
+        `Aid Pledge #${newDonation.id} Registered`,
+        `${newDonation.quantity} ${newDonation.unit} of ${newDonation.category} plotted at ${newDonation.safeZone}.`,
+        'bg-emerald-500'
+      );
+    }
+
+    function cycleReportStatus(reportId) {
+      const report = emergencyReports.find(r => r.id === reportId);
+      if (!report) return;
+
+      if (report.status === 'Pending') {
+        report.status = 'In Progress';
+      } else if (report.status === 'In Progress') {
+        report.status = 'Resolved';
+      } else {
+        report.status = 'Pending';
+      }
+
+      renderMapPins();
+      renderTablesAndKPIs();
+      focusPinOnMap(`pin-report-${report.id}`);
+
+      appendSqlLog(
+        `UPDATE Emergency_Reports SET Status = '${report.status}' WHERE Report_ID = ${report.id};`
+      );
+
+      showToast(
+        `Report #${report.id} Updated`,
+        `${report.disasterType} status set to "${report.status}".`,
+        report.status === 'Resolved' ? 'bg-emerald-400' : 'bg-sky-400'
+      );
+    }
+
+    // =========================================================================
+    // 6. LAST-PING BLACKOUT RADAR ACTIONS & SIMULATIONS
+    // =========================================================================
+    function simulateSeismicBlackout() {
+      const nowStr = new Date().toTimeString().slice(0, 8);
+      const blackoutBurst = [
+        // Zone Beta: Bandar Sunway Tower (5 Devices Lost)
+        { deviceId: 'DEV-SW-3101', clusterId: 'ZONE-BETA', sectorName: 'Sunway South Tower', lat: 3.0672, lng: 101.6052, top: 61, left: 69, batteryPct: 81, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-SW-3104', clusterId: 'ZONE-BETA', sectorName: 'Sunway South Tower', lat: 3.0679, lng: 101.6061, top: 65, left: 74, batteryPct: 59, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-SW-3109', clusterId: 'ZONE-BETA', sectorName: 'Sunway South Tower', lat: 3.0666, lng: 101.6058, top: 69, left: 71, batteryPct: 34, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-SW-3115', clusterId: 'ZONE-BETA', sectorName: 'Sunway South Tower', lat: 3.0675, lng: 101.6046, top: 64, left: 66, batteryPct: 90, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-SW-3122', clusterId: 'ZONE-BETA', sectorName: 'Sunway South Tower', lat: 3.0681, lng: 101.6055, top: 59, left: 73, batteryPct: 47, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        // Zone Alpha Reinforcement: +3 Devices in SS15 Commercial Block
+        { deviceId: 'DEV-SJ-9011', clusterId: 'ZONE-ALPHA', sectorName: 'SS15 Commercial Block', lat: 3.0742, lng: 101.5966, top: 34, left: 50, batteryPct: 72, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-SJ-9018', clusterId: 'ZONE-ALPHA', sectorName: 'SS15 Commercial Block', lat: 3.0739, lng: 101.5974, top: 38, left: 53, batteryPct: 28, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-SJ-9025', clusterId: 'ZONE-ALPHA', sectorName: 'SS15 Commercial Block', lat: 3.0747, lng: 101.5961, top: 30, left: 51, batteryPct: 66, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        // Zone Gamma: USJ 7 Transit Hub (4 Devices Lost)
+        { deviceId: 'DEV-USJ-5501', clusterId: 'ZONE-GAMMA', sectorName: 'USJ 7 Transit Hub', lat: 3.0551, lng: 101.5920, top: 76, left: 32, batteryPct: 84, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-USJ-5506', clusterId: 'ZONE-GAMMA', sectorName: 'USJ 7 Transit Hub', lat: 3.0545, lng: 101.5928, top: 80, left: 36, batteryPct: 61, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-USJ-5512', clusterId: 'ZONE-GAMMA', sectorName: 'USJ 7 Transit Hub', lat: 3.0554, lng: 101.5915, top: 74, left: 29, batteryPct: 39, lastPing: nowStr, connectionStatus: 'Signal Lost' },
+        { deviceId: 'DEV-USJ-5519', clusterId: 'ZONE-GAMMA', sectorName: 'USJ 7 Transit Hub', lat: 3.0548, lng: 101.5924, top: 82, left: 31, batteryPct: 53, lastPing: nowStr, connectionStatus: 'Signal Lost' }
+      ];
+
+      blackoutBurst.forEach(item => {
+        if (!userHeartbeats.some(existing => existing.deviceId === item.deviceId)) {
+          userHeartbeats.push(item);
+        }
+      });
+
+      blackoutLayerEnabled = true;
+      document.getElementById('blackoutLayerLabel').textContent = 'Blackout Radar: ON';
+
+      renderMapPins();
+      renderTablesAndKPIs();
+      switchFormTab('blackout');
+      switchFeedTab('heartbeats');
+
+      appendSqlLog(
+        `-- SEISMIC EVENT DETECTED (6.4M): Batch heartbeat flatline across 3 sectors\nINSERT INTO User_Heartbeats (Device_ID, Last_Lat, Last_Lng, Battery_Pct, Last_Ping, Connection_Status)\nVALUES ('DEV-SW-3101', 3.0672, 101.6052, 81, '${nowStr}', 'Signal Lost'), ... (+12 devices);\n\nSELECT Cluster_ID, COUNT(*) AS Lost_Devices, AVG(Last_Lat) AS Centroid_Lat, AVG(Last_Lng) AS Centroid_Lng\nFROM User_Heartbeats WHERE Connection_Status = 'Signal Lost' GROUP BY Cluster_ID;`
+      );
+
+      showToast(
+        'Seismic Blackout Detected (12 Devices Lost)',
+        'Silent Concentration Zones auto-plotted at Sunway South Tower, SS15 & USJ 7.',
+        'bg-purple-500'
+      );
+    }
+
+    function resetBlackoutHeartbeats() {
+      userHeartbeats = JSON.parse(JSON.stringify(INITIAL_HEARTBEATS));
+      dispatchedBlackoutZones = {};
+      renderMapPins();
+      renderTablesAndKPIs();
+      showToast('Blackout Radar Reset', 'Restored baseline heartbeat telemetry state.', 'bg-purple-400');
+    }
+
+    function dispatchSarToBlackoutZone(clusterId) {
+      dispatchedBlackoutZones[clusterId] = true;
+      renderTablesAndKPIs();
+
+      const clusters = computeSilentConcentrationClusters();
+      const target = clusters.find(c => c.clusterId === clusterId);
+
+      appendSqlLog(
+        `-- SAR DISPATCHED TO SILENT ZONE ${clusterId}\nUPDATE Silent_Zones SET Status = 'SAR Dispatched' WHERE Cluster_ID = '${clusterId}';`
+      );
+
+      showToast(
+        `SAR Dispatched to ${clusterId}`,
+        `Search & Rescue team routed to silent blackout centroid (${target ? target.sectorName : clusterId}).`,
+        'bg-sky-400'
+      );
+    }
+
+    function toggleBlackoutRadarLayer() {
+      blackoutLayerEnabled = !blackoutLayerEnabled;
+      document.getElementById('blackoutLayerLabel').textContent = blackoutLayerEnabled
+        ? 'Blackout Radar: ON'
+        : 'Blackout Radar: OFF';
+      renderMapPins();
+    }
+
+    function toggleHeatmapZones() {
+      heatmapEnabled = !heatmapEnabled;
+      const layer = document.getElementById('sosHeatZonesLayer');
+      layer.style.display = heatmapEnabled ? 'block' : 'none';
+      document.getElementById('heatmapToggleLabel').textContent = heatmapEnabled
+        ? 'SOS Zones: ON'
+        : 'SOS Zones: OFF';
+    }
+
+    function filterMarkers(filterKey, btnEl) {
+      activeFilter = filterKey;
+      renderMapPins();
+
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.classList.remove('ring-2', 'ring-sky-400');
+      });
+      if (btnEl) btnEl.classList.add('ring-2', 'ring-sky-400');
+    }
+
+    function simulateAftershock() {
+      const presets = [
+        { top: 44, left: 46, lat: 3.0715, lng: 101.5965, type: 'Building Collapse', res: 'Heavy Rescue Tools' },
+        { top: 31, left: 62, lat: 3.0770, lng: 101.6023, type: 'Trapped Persons', res: 'Medical Supplies' },
+        { top: 55, left: 53, lat: 3.0669, lng: 101.5991, type: 'Gas Leak', res: 'Evacuation Transport' }
+      ];
+      const pick = presets[Math.floor(Math.random() * presets.length)];
+      const jitterTop = +(pick.top + (Math.random() * 4 - 2)).toFixed(1);
+      const jitterLeft = +(pick.left + (Math.random() * 4 - 2)).toFixed(1);
+
+      const simReport = {
+        id: nextReportId++,
+        disasterType: pick.type,
+        resourceNeeded: pick.res,
+        level: 'Critical',
+        lat: pick.lat,
+        lng: pick.lng,
+        top: jitterTop,
+        left: jitterLeft,
+        status: 'Pending'
+      };
+
+      emergencyReports.push(simReport);
+      activeFilter = 'all';
+      renderMapPins();
+      renderTablesAndKPIs();
+      switchFeedTab('reports');
+      focusPinOnMap(`pin-report-${simReport.id}`);
+
+      appendSqlLog(
+        `INSERT INTO Emergency_Reports (Report_ID, Disaster_Type, Resource_Needed, Critical_Level, Latitude, Longitude, Status)\nVALUES (${simReport.id}, '${simReport.disasterType}', '${simReport.resourceNeeded}', 'Critical', ${simReport.lat}, ${simReport.lng}, 'Pending');`
+      );
+
+      showToast(
+        `Aftershock SOS #${simReport.id} Detected!`,
+        `Critical ${simReport.disasterType} reported at (${simReport.lat}, ${simReport.lng}).`,
+        'bg-red-500'
+      );
+    }
+
+    // =========================================================================
+    // 7. TABLES, KPI COUNTERS & UI FORM HELPERS
+    // =========================================================================
+    function renderTablesAndKPIs() {
+      const reportsTbody = document.getElementById('reportsTableBody');
+      reportsTbody.innerHTML = '';
+
+      [...emergencyReports].reverse().forEach(r => {
+        let levelBadge = '<span class="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-bold text-[11px]">Medium</span>';
+        if (r.level === 'Critical') {
+          levelBadge = '<span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/40 font-bold text-[11px]">Critical</span>';
+        } else if (r.level === 'High') {
+          levelBadge = '<span class="px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/40 font-bold text-[11px]">High</span>';
+        }
+
+        let statusBadge = '<span class="text-amber-400 font-semibold">Pending</span>';
+        let btnLabel = 'Dispatch Rescue';
+        let btnClass = 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40';
+
+        if (r.status === 'In Progress') {
+          statusBadge = '<span class="text-sky-400 font-semibold">In Progress</span>';
+          btnLabel = 'Mark Resolved';
+          btnClass = 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40';
+        } else if (r.status === 'Resolved') {
+          statusBadge = '<span class="text-emerald-400 font-semibold">Resolved</span>';
+          btnLabel = '✓ Resolved';
+          btnClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/60 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 pr-3 font-mono-tech text-slate-300">#${r.id}</td>
+          <td class="py-2.5 px-3 font-bold text-white cursor-pointer hover:text-sky-400" onclick="focusPinOnMap('pin-report-${r.id}')">${r.disasterType}</td>
+          <td class="py-2.5 px-3 text-slate-300">${r.resourceNeeded}</td>
+          <td class="py-2.5 px-3">${levelBadge}</td>
+          <td class="py-2.5 px-3 font-mono-tech text-[11px] text-slate-400">${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}</td>
+          <td class="py-2.5 px-3 text-xs">${statusBadge}</td>
+          <td class="py-2.5 pl-3 text-right">
+            <button onclick="cycleReportStatus(${r.id})" class="px-2.5 py-1 rounded text-[11px] font-bold transition ${btnClass}">
+              ${btnLabel}
+            </button>
+          </td>
+        `;
+        reportsTbody.appendChild(tr);
+      });
+
+      const donationsTbody = document.getElementById('donationsTableBody');
+      donationsTbody.innerHTML = '';
+
+      [...communityDonations].reverse().forEach(d => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/60 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 pr-3 font-mono-tech text-emerald-400">#${d.id}</td>
+          <td class="py-2.5 px-3 font-bold text-white cursor-pointer hover:text-emerald-400" onclick="focusPinOnMap('pin-donation-${d.id}')">${d.category}</td>
+          <td class="py-2.5 px-3 font-mono-tech text-slate-200">${d.quantity} ${d.unit}</td>
+          <td class="py-2.5 px-3 text-slate-300">${d.donorName}</td>
+          <td class="py-2.5 px-3 text-slate-300">${d.safeZone}</td>
+          <td class="py-2.5 pl-3 text-right">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold text-[11px]">
+              ${d.status}
+            </span>
+          </td>
+        `;
+        donationsTbody.appendChild(tr);
+      });
+
+      const highMedActiveCount = emergencyReports.filter(r => r.level !== 'Critical' && r.status !== 'Resolved').length;
+      const criticalCount = emergencyReports.filter(r => r.level === 'Critical' && r.status !== 'Resolved').length;
+      const lostDevicesCount = userHeartbeats.filter(d => d.connectionStatus === 'Signal Lost').length;
+
+      document.getElementById('kpiActiveReports').textContent = highMedActiveCount;
+      document.getElementById('kpiCriticalAlerts').textContent = criticalCount;
+      document.getElementById('kpiSupplyHubs').textContent = communityDonations.length;
+      document.getElementById('kpiSignalLost').textContent = lostDevicesCount;
+
+      document.getElementById('badgeReportCount').textContent = emergencyReports.length;
+      document.getElementById('badgeDonationCount').textContent = communityDonations.length;
+      document.getElementById('badgeHeartbeatCount').textContent = userHeartbeats.length;
+
+      renderBlackoutSidebarAndTable();
+    }
+
+    function renderBlackoutSidebarAndTable() {
+      const clusters = computeSilentConcentrationClusters();
+      const zonesContainer = document.getElementById('silentZonesList');
+      const miniList = document.getElementById('lklMiniList');
+      const hbTbody = document.getElementById('heartbeatsTableBody');
+
+      document.getElementById('silentZoneCountBadge').textContent = `${clusters.length} Active Zone${clusters.length === 1 ? '' : 's'}`;
+      document.getElementById('lklDeviceSummary').textContent = `${userHeartbeats.length} Devices Offline`;
+
+      zonesContainer.innerHTML = '';
+      clusters.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'bg-[#0f172a] border border-purple-500/40 rounded-lg p-3 space-y-2';
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-xs font-bold text-white">${c.sectorName}</div>
+              <div class="text-[11px] text-purple-300 font-semibold">${c.count} Devices Lost Simultaneously • Centroid (${c.centerLat}, ${c.centerLng})</div>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono-tech font-bold ${c.sarDispatched ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' : 'bg-purple-500/20 text-purple-300 border border-purple-500/40'}">
+              ${c.sarDispatched ? 'SAR Dispatched' : 'Unverified Blackout'}
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="dispatchSarToBlackoutZone('${c.clusterId}')" ${c.sarDispatched ? 'disabled' : ''} class="w-full ${c.sarDispatched ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 cursor-default' : 'bg-purple-600 hover:bg-purple-500 text-white'} text-[11px] font-bold py-1.5 px-2.5 rounded-md transition">
+              ${c.sarDispatched ? '✓ Search & Rescue En Route' : 'Dispatch Search & Rescue to Centroid'}
+            </button>
+          </div>
+        `;
+        zonesContainer.appendChild(card);
+      });
+
+      miniList.innerHTML = '';
+      [...userHeartbeats].reverse().forEach(dev => {
+        const row = document.createElement('div');
+        row.className = 'px-3 py-1.5 flex items-center justify-between hover:bg-slate-800/60 cursor-pointer';
+        row.onclick = () => focusPinOnMap(`pin-lkl-${dev.deviceId}`);
+        row.innerHTML = `
+          <span class="text-purple-300 font-bold">${dev.deviceId}</span>
+          <span class="text-slate-400">${dev.lat.toFixed(4)}, ${dev.lng.toFixed(4)}</span>
+          <span class="text-slate-300">🔋${dev.batteryPct}%</span>
+          <span class="text-red-400">${dev.lastPing}</span>
+        `;
+        miniList.appendChild(row);
+      });
+
+      hbTbody.innerHTML = '';
+      [...userHeartbeats].reverse().forEach(dev => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/60 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 pr-3 font-mono-tech font-bold text-purple-300 cursor-pointer hover:text-white" onclick="focusPinOnMap('pin-lkl-${dev.deviceId}')">${dev.deviceId}</td>
+          <td class="py-2.5 px-3 text-slate-200">${dev.sectorName} <span class="text-[10px] font-mono-tech text-slate-400">(${dev.clusterId})</span></td>
+          <td class="py-2.5 px-3 font-mono-tech text-[11px] text-slate-300">${dev.lat.toFixed(4)}, ${dev.lng.toFixed(4)}</td>
+          <td class="py-2.5 px-3 font-mono-tech text-slate-300">${dev.batteryPct}%</td>
+          <td class="py-2.5 px-3 font-mono-tech text-slate-400">${dev.lastPing}</td>
+          <td class="py-2.5 pl-3 text-right">
+            <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-semibold text-[11px]">
+              ${dev.connectionStatus}
+            </span>
+          </td>
+        `;
+        hbTbody.appendChild(tr);
+      });
+    }
+
+    function selectDisasterType(type, suggestedResource, btnEl) {
+      document.getElementById('inputDisasterType').value = type;
+      document.getElementById('inputResourceNeeded').value = suggestedResource;
+
+      document.querySelectorAll('.disaster-btn').forEach(btn => {
+        btn.className = 'disaster-btn border border-[#334155] bg-[#0f172a] hover:border-slate-500 text-slate-200 rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16';
+        if (btn.textContent.includes('Blocked Road')) {
+          btn.classList.add('col-span-2');
+        }
+      });
+
+      btnEl.className = 'disaster-btn border-2 border-red-500 bg-red-500/20 text-white rounded-lg p-2.5 text-left transition flex flex-col justify-between h-16';
+      if (type === 'Blocked Road') {
+        btnEl.classList.add('col-span-2');
+      }
+    }
+
+    function selectCriticalLevel(level, btnEl) {
+      document.getElementById('inputCriticalLevel').value = level;
+
+      document.querySelectorAll('.crit-btn').forEach(btn => {
+        btn.className = 'crit-btn border border-[#334155] bg-[#0f172a] text-slate-300 py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition';
+      });
+
+      if (level === 'Critical') {
+        btnEl.className = 'crit-btn border-2 border-red-500 bg-red-500/25 text-white py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition';
+      } else if (level === 'High') {
+        btnEl.className = 'crit-btn border-2 border-orange-500 bg-orange-500/25 text-white py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition';
+      } else {
+        btnEl.className = 'crit-btn border-2 border-yellow-400 bg-yellow-400/20 text-white py-2.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition';
+      }
+    }
+
+    function applySectorPreset() {
+      const [leftStr, topStr, latStr, lngStr] = document.getElementById('inputSectorPreset').value.split(',');
+      document.getElementById('inputSurvivorLeft').value = leftStr;
+      document.getElementById('inputSurvivorTop').value = topStr;
+      document.getElementById('inputSurvivorLat').value = latStr;
+      document.getElementById('inputSurvivorLng').value = lngStr;
+
+      const crosshair = document.getElementById('targetCrosshair');
+      crosshair.style.left = leftStr + '%';
+      crosshair.style.top = topStr + '%';
+    }
+
+    function syncDonorUnit() {
+      const select = document.getElementById('inputDonorCategory');
+      const unit = select.options[select.selectedIndex].getAttribute('data-unit');
+      document.getElementById('inputDonorUnit').value = unit;
+    }
+
+    function syncDonorZoneCoords() {
+      const select = document.getElementById('inputDonorSafeZone');
+      const opt = select.options[select.selectedIndex];
+      const top = opt.getAttribute('data-top');
+      const left = opt.getAttribute('data-left');
+      const lat = opt.getAttribute('data-lat');
+      const lng = opt.getAttribute('data-lng');
+
+      document.getElementById('inputDonorTop').value = top;
+      document.getElementById('inputDonorLeft').value = left;
+      document.getElementById('inputDonorLat').value = lat;
+      document.getElementById('inputDonorLng').value = lng;
+
+      const crosshair = document.getElementById('targetCrosshair');
+      crosshair.style.left = left + '%';
+      crosshair.style.top = top + '%';
+    }
+
+    function switchFormTab(mode) {
+      activeFormMode = mode;
+      const survivorForm = document.getElementById('survivorForm');
+      const donorForm = document.getElementById('donorForm');
+      const blackoutPanel = document.getElementById('blackoutPanel');
+      const btnSurvivor = document.getElementById('tabBtnSurvivor');
+      const btnDonor = document.getElementById('tabBtnDonor');
+      const btnBlackout = document.getElementById('tabBtnBlackout');
+
+      survivorForm.classList.add('hidden');
+      donorForm.classList.add('hidden');
+      blackoutPanel.classList.add('hidden');
+
+      btnSurvivor.className = 'py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition text-slate-400 hover:text-white';
+      btnDonor.className = 'py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition text-slate-400 hover:text-white';
+      btnBlackout.className = 'py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition text-purple-300 hover:text-white';
+
+      if (mode === 'survivor') {
+        survivorForm.classList.remove('hidden');
+        btnSurvivor.className = 'py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition bg-red-500 text-white shadow-md';
+      } else if (mode === 'donor') {
+        donorForm.classList.remove('hidden');
+        btnDonor.className = 'py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition bg-emerald-600 text-white shadow-md';
+      } else {
+        blackoutPanel.classList.remove('hidden');
+        btnBlackout.className = 'py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition bg-purple-600 text-white shadow-md';
+      }
+    }
+
+    function switchFeedTab(tab) {
+      const panelReports = document.getElementById('feedPanelReports');
+      const panelDonations = document.getElementById('feedPanelDonations');
+      const panelHeartbeats = document.getElementById('feedPanelHeartbeats');
+      const btnReports = document.getElementById('feedTabReports');
+      const btnDonations = document.getElementById('feedTabDonations');
+      const btnHeartbeats = document.getElementById('feedTabHeartbeats');
+
+      panelReports.classList.add('hidden');
+      panelDonations.classList.add('hidden');
+      panelHeartbeats.classList.add('hidden');
+
+      btnReports.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white border border-transparent transition';
+      btnDonations.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white border border-transparent transition';
+      btnHeartbeats.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-purple-300 border border-transparent transition';
+
+      if (tab === 'reports') {
+        panelReports.classList.remove('hidden');
+        btnReports.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 transition';
+      } else if (tab === 'donations') {
+        panelDonations.classList.remove('hidden');
+        btnDonations.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 transition';
+      } else {
+        panelHeartbeats.classList.remove('hidden');
+        btnHeartbeats.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 transition';
+      }
+    }
+
+    function appendSqlLog(sqlStatement) {
+      const logEl = document.getElementById('sqlCodeLog');
+      logEl.textContent += `\n\n${sqlStatement}`;
+    }
+
+    function toggleSqlModal() {
+      const modal = document.getElementById('sqlModal');
+      modal.classList.toggle('hidden');
+      modal.classList.toggle('flex');
+    }
+
+    function copySqlLog() {
+      const text = document.getElementById('sqlCodeLog').textContent;
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showToast('SQL Copied', 'Live SQL queries copied to clipboard.', 'bg-sky-400');
+    }
+
+    let toastTimer;
+    function showToast(title, message, dotClass) {
+      const banner = document.getElementById('toastBanner');
+      const icon = document.getElementById('toastIcon');
+      document.getElementById('toastTitle').textContent = title;
+      document.getElementById('toastMessage').textContent = message;
+      icon.className = `mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${dotClass}`;
+
+      banner.classList.remove('translate-y-24', 'opacity-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        banner.classList.add('translate-y-24', 'opacity-0');
+      }, 3600);
+    }
+
+    // Boot Application on Window Load
+    window.onload = function () {
+      renderMapPins();
+      renderTablesAndKPIs();
+    };
+  </script>
+</body>
+</html>
