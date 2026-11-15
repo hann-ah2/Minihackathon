@@ -1,0 +1,53 @@
+/* Last-Ping demo radar layer; does not change emergency marker styling. */
+.last-ping-leaflet-icon {
+  background: transparent !important;
+  border: none !important;
+}
+.last-ping-pin {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #f3e8ff;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 0 5px rgba(168,85,247,0.22), 0 0 18px 6px rgba(168,85,247,0.45);
+}
+.last-ping-pin::before {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  top: 4px;
+  left: 4px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 5px white;
+}
+.last-ping-pin::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: rgba(168,85,247,.5);
+  z-index: -1;
+  animation: last-ping-pulse 2s ease-out infinite;
+}
+@keyframes last-ping-pulse {
+  from { transform: scale(.85); opacity: .8; }
+  to { transform: scale(3.5); opacity: 0; }
+}
+.leaflet-tooltip.silent-zone-tooltip {
+  background: rgba(59, 7, 100, 0.92);
+  color: #f3e8ff;
+  border: 1px solid #c084fc;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.leaflet-tooltip.silent-zone-tooltip::before { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .last-ping-pin::after { animation: none; display: none; }
+}
