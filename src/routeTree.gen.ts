@@ -10,19 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as MissionsRouteImport } from './routes/missions'
+import { Route as DonateRouteImport } from './routes/donate'
 import { Route as ReportRouteImport } from './routes/report'
-import { Route as TeamsRouteImport } from './routes/teams'
-import { Route as TrackRouteImport } from './routes/track'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MissionsRoute = MissionsRouteImport.update({
-  id: '/missions',
-  path: '/missions',
+const DonateRoute = DonateRouteImport.update({
+  id: '/donate',
+  path: '/donate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportRoute = ReportRouteImport.update({
@@ -30,53 +28,35 @@ const ReportRoute = ReportRouteImport.update({
   path: '/report',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TeamsRoute = TeamsRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TrackRoute = TrackRouteImport.update({
-  id: '/track',
-  path: '/track',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/missions': typeof MissionsRoute
+  '/donate': typeof DonateRoute
   '/report': typeof ReportRoute
-  '/teams': typeof TeamsRoute
-  '/track': typeof TrackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/missions': typeof MissionsRoute
+  '/donate': typeof DonateRoute
   '/report': typeof ReportRoute
-  '/teams': typeof TeamsRoute
-  '/track': typeof TrackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/missions': typeof MissionsRoute
+  '/donate': typeof DonateRoute
   '/report': typeof ReportRoute
-  '/teams': typeof TeamsRoute
-  '/track': typeof TrackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/missions' | '/report' | '/teams' | '/track'
+  fullPaths: '/' | '/donate' | '/report'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/missions' | '/report' | '/teams' | '/track'
-  id: '__root__' | '/' | '/missions' | '/report' | '/teams' | '/track'
+  to: '/' | '/donate' | '/report'
+  id: '__root__' | '/' | '/donate' | '/report'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  MissionsRoute: typeof MissionsRoute
+  DonateRoute: typeof DonateRoute
   ReportRoute: typeof ReportRoute
-  TeamsRoute: typeof TeamsRoute
-  TrackRoute: typeof TrackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -88,11 +68,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/missions': {
-      id: '/missions'
-      path: '/missions'
-      fullPath: '/missions'
-      preLoaderRoute: typeof MissionsRouteImport
+    '/donate': {
+      id: '/donate'
+      path: '/donate'
+      fullPath: '/donate'
+      preLoaderRoute: typeof DonateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/report': {
@@ -102,29 +82,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/teams': {
-      id: '/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof TeamsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/track': {
-      id: '/track'
-      path: '/track'
-      fullPath: '/track'
-      preLoaderRoute: typeof TrackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  MissionsRoute: MissionsRoute,
+  DonateRoute: DonateRoute,
   ReportRoute: ReportRoute,
-  TeamsRoute: TeamsRoute,
-  TrackRoute: TrackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

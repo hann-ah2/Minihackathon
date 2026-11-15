@@ -85,10 +85,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "RESCUEGRID" },
-      { name: "description", content: "Community Disaster Response & Recovery Demonstration" },
+      { name: "description", content: "Community Help Requests and Donations Demo" },
       { name: "author", content: "RESCUEGRID" },
       { property: "og:title", content: "RESCUEGRID" },
-      { property: "og:description", content: "Community Disaster Response & Recovery Demonstration" },
+      { property: "og:description", content: "Community Help Requests and Donations Demo" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
 
@@ -96,12 +96,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@500;600;700;800&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" },
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
   shellComponent: RootShell,
